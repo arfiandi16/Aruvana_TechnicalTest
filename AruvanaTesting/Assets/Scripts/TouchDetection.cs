@@ -4,55 +4,58 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
-public class TouchDetection : MonoBehaviour, IPinchable
+public class TouchDetection : MonoBehaviour
 {
     [SerializeField] private float speed=10f;
-    [SerializeField] private float speedRotation=10f;
-    private string axis;
-    private bool rotate;
-    private Vector3 firstRotation;
-    private Vector3 firstPosition;
-    private float firstScale,currentScale;
-    private Transform child;
-    private float differenceScale;
+    [SerializeField] private float speedRotation=10f;  
+    private Transform child; 
     private Coroutine zoomCoroutine,rotateCoroutine;
     [SerializeField]private Vector3 minScale, maxScale;
+    private Color startColor;
+    private Renderer renderObject; 
+    private UnityTouch controlTouch;
+    private SkinnedMeshRenderer skinnedMeshRenderer;
+    [SerializeField]private ParticleSystem fireEffect;
+    [SerializeField]private AudioSource fireSound;
+    private string statusName = "";
 
-    [SerializeField]private TextMeshProUGUI aaa,PInfo;
-    private UnityTouch controlTouch; 
+    private bool isBlinking = false;
     private void Awake()
     {
         controlTouch = new UnityTouch();
     }
     void Start()
-    {
-        controlTouch.Touch.PrimaryFingerPosition.started += RotateStart;
-        controlTouch.Touch.PrimaryFingerPosition.canceled += RotateEnd;
+    { 
+        controlTouch.Touch.PrimaryTouchContact.started += RotateStart;
+        controlTouch.Touch.PrimaryTouchContact.canceled += RotateEnd;
         controlTouch.Touch.SecondaryTouchContact.started += ZoomStart;
         controlTouch.Touch.SecondaryTouchContact.canceled +=ZoomEnd;
 
         child = transform.GetChild(0);
-        firstRotation = child.transform.localEulerAngles;
-        firstPosition = child.transform.localPosition; 
-        
+        renderObject = child.GetComponent<Renderer>();
+        startColor = renderObject.material.color;
+        skinnedMeshRenderer = child.GetComponent<SkinnedMeshRenderer>();
+        fireEffect.Stop(); 
     }
 
     private void ZoomEnd(UnityEngine.InputSystem.InputAction.CallbackContext obj)
     {
-        StopCoroutine(zoomCoroutine);
+        StopCoroutine(zoomCoroutine); 
     }
 
     private void ZoomStart(UnityEngine.InputSystem.InputAction.CallbackContext obj)
     {
+        statusName = "zoom";
         zoomCoroutine = StartCoroutine(ZoomDetection());
     }
     private void RotateEnd(UnityEngine.InputSystem.InputAction.CallbackContext obj)
     {
-        StopCoroutine(rotateCoroutine);
+        StopCoroutine(rotateCoroutine); 
     }
 
     private void RotateStart(UnityEngine.InputSystem.InputAction.CallbackContext obj)
     {
+        statusName = "rotate";
         rotateCoroutine = StartCoroutine(Rotate());
     }
 
@@ -62,7 +65,7 @@ public class TouchDetection : MonoBehaviour, IPinchable
     }
     private void OnDisable()
     {
-        controlTouch.Disable();
+        controlTouch.Disable(); 
     }
 
     IEnumerator ZoomDetection()
@@ -71,10 +74,10 @@ public class TouchDetection : MonoBehaviour, IPinchable
         float distance = 0f; 
         float previousDistance = 0f;
         Vector3 targetScale = child.localScale;
-        while (true)
+        while (true && statusName== "zoom" && !isBlinking)
         {
             distance = Vector2.Distance(controlTouch.Touch.PrimaryFingerPosition.ReadValue<Vector2>(), controlTouch.Touch.SecondaryFingerPosition.ReadValue<Vector2>());
-            PInfo.text = "D = " + distance.ToString() + ", PD = " + previousDistance.ToString();
+            //PInfo.text = "D = " + distance.ToString() + ", PD = " + previousDistance.ToString();
             if (distance != previousDistance)
             {
                 if (distance > previousDistance)
@@ -103,7 +106,7 @@ public class TouchDetection : MonoBehaviour, IPinchable
         Vector2 previousPosition = Vector2.zero;
         Vector3 targetRotation = child.localRotation.eulerAngles;
         
-        while (true)
+        while (true && statusName=="rotate" && !isBlinking)
         {
             Vector2 currentPosition = controlTouch.Touch.PrimaryFingerPosition.ReadValue<Vector2>();
             Vector2 delta = currentPosition - previousPosition;
@@ -111,7 +114,7 @@ public class TouchDetection : MonoBehaviour, IPinchable
             {
                 targetRotation -=  delta.normalized.x * speedRotation* Vector3.up;
             }
-            PInfo.text = "prev = " + previousPosition.ToString() + "current = " + targetRotation.ToString();
+            //PInfo.text = "prev = " + previousPosition.ToString() + "current = " + targetRotation.ToString();
             child.localRotation = Quaternion.Euler(targetRotation);
             previousPosition = currentPosition; 
             yield return null;
@@ -121,55 +124,43 @@ public class TouchDetection : MonoBehaviour, IPinchable
     // Update is called once per frame
     void Update()
     {
-       // aaa.text = "D = " + distance.ToString() + ", PD = "+previousDistance.ToString();
-        currentScale = transform.GetChild(0).localScale.x;
-        differenceScale = currentScale - firstScale; 
-        if (rotate)
+        if (isBlinking)
         {
-            if (axis.Equals("left"))
+            renderObject.material.color = Color.Lerp(startColor, Color.white, Mathf.PingPong(Time.time * speed, 1));
+        }
+
+        if (child != null)
+        {
+            if (skinnedMeshRenderer.enabled == true)
             {
-                child.transform.Rotate(Vector3.up * speed*5 * Time.deltaTime);
-            }
-            else if (axis.Equals("right"))
-            {
-                child.transform.Rotate(Vector3.down* speed*5 * Time.deltaTime);
-            }
-            else if (axis.Equals("up"))
-            {
-                if (differenceScale <= 15f)
+                fireEffect.Play();
+                if (!fireSound.isPlaying)
                 {
-                    child.transform.localScale += Vector3.one * speed * Time.deltaTime;
-                }
-                
-            }
-            else if (axis.Equals("down"))
-            {
-                if (differenceScale > 0f)
-                {
-                    child.transform.localScale -= Vector3.one * speed * Time.deltaTime;
+                    fireSound.Play();
                 } 
+            }
+            else
+            { 
+                fireEffect.Stop();
+                if (fireSound.isPlaying)
+                {
+                    fireSound.Stop();
+                }
             }
         }
     }
 
-    public void RotateCube(string arah)
+
+    public void BlinkStart()
     {
-        axis = arah;
-        rotate = true;
+        isBlinking = true;
     }
 
-    public void StopRotate()
+    public void BlinkEnd()
     {
-        rotate = false;
+        isBlinking = false;
+        renderObject.material.color = startColor;
     }
 
-    public void OnPinchStart()
-    {
-        firstScale = child.localScale.x;
-    }
 
-    public void OnPinchUpdate(float scaleFactor)
-    {
-        throw new System.NotImplementedException();
-    }
 }
