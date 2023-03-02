@@ -18,6 +18,7 @@ public class TouchDetection : MonoBehaviour
     [SerializeField]private ParticleSystem fireEffect;
     [SerializeField]private AudioSource fireSound;
     private string statusName = "";
+    private bool buttonTouch=false ;
 
     private bool isBlinking = false;
     private void Awake()
@@ -74,7 +75,7 @@ public class TouchDetection : MonoBehaviour
         float distance = 0f; 
         float previousDistance = 0f;
         Vector3 targetScale = child.localScale;
-        while (true && statusName== "zoom" && !isBlinking)
+        while (true && statusName== "zoom" && !isBlinking && !buttonTouch)
         {
             distance = Vector2.Distance(controlTouch.Touch.PrimaryFingerPosition.ReadValue<Vector2>(), controlTouch.Touch.SecondaryFingerPosition.ReadValue<Vector2>());
             //PInfo.text = "D = " + distance.ToString() + ", PD = " + previousDistance.ToString();
@@ -106,7 +107,7 @@ public class TouchDetection : MonoBehaviour
         Vector2 previousPosition = Vector2.zero;
         Vector3 targetRotation = child.localRotation.eulerAngles;
         
-        while (true && statusName=="rotate" && !isBlinking)
+        while (true && statusName=="rotate" && !isBlinking && !buttonTouch)
         {
             Vector2 currentPosition = controlTouch.Touch.PrimaryFingerPosition.ReadValue<Vector2>();
             Vector2 delta = currentPosition - previousPosition;
@@ -162,5 +163,13 @@ public class TouchDetection : MonoBehaviour
         renderObject.material.color = startColor;
     }
 
+    public void ButtonTouchStart()
+    {
+        buttonTouch = true;
+    }
+    public void ButtonTouchEnd()
+    {
+        buttonTouch = false;
+    }
 
 }
